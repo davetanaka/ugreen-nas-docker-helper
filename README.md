@@ -435,9 +435,9 @@ Synologyが高価な理由の一つは、300以上のアプリを自社でテス
 
 ### 貢献の種類
 
-1. **問題報告**: [Issues](https://github.com/yourname/ugreen-nas-docker-helper/issues)で問題を報告
-2. **改善提案**: [Pull Requests](https://github.com/yourname/ugreen-nas-docker-helper/pulls)で改善案を提出  
-3. **体験共有**: [Discussions](https://github.com/yourname/ugreen-nas-docker-helper/discussions)であなたの経験を共有
+1. **問題報告**: [Issues](https://github.com/davetanaka/ugreen-nas-docker-helper/issues)で問題を報告
+2. **改善提案**: [Pull Requests](https://github.com/davetanaka/ugreen-nas-docker-helper/pulls)で改善案を提出  
+3. **体験共有**: [Discussions](https://github.com/davetanaka/ugreen-nas-docker-helper/discussions)であなたの経験を共有
 4. **ドキュメント改善**: 誤字脱字の修正や分かりやすい説明の追加
 5. **新しいStackテンプレート**: 他の有用なアプリの組み合わせを提案
 

@@ -26,15 +26,15 @@
 
 ```bash
 # MacまたはWindowsのターミナルから
-ssh ugreenadmin@あなたのNASのIPアドレス
-# 例: ssh ugreenadmin@192.168.0.78
+ssh nasuser@あなたのNASのIPアドレス
+# 例: ssh nasuser@192.168.0.78
 ```
 
 ### 1.2 環境検出スクリプトのダウンロードと実行
 
 ```bash
 # スクリプトをダウンロード
-wget -O ugreen-env-detect.sh https://raw.githubusercontent.com/yourusername/ugreen-nas-docker-helper/main/scripts/ugreen-env-detect.sh
+wget -O ugreen-env-detect.sh https://raw.githubusercontent.com/davetanaka/ugreen-nas-docker-helper/main/scripts/ugreen-env-detect.sh
 
 # 実行権限を付与
 chmod +x ugreen-env-detect.sh
@@ -429,7 +429,7 @@ free -h
 - **環境・社会影響(ESI)**: 8点 - 特筆すべき配慮なし
 - **総合**: 59点
 
-### After（神3アプリ導入後）
+### After（神5アプリ導入後）
 - **コスパ(VE)**: 19点 - 投資効果抜群！
 - **健康プラス度(HH)**: 17点 - セキュリティ安心、学習機会、エンタメ向上
 - **使いやすさ(UE)**: 16点 - Portainerで直感操作可能

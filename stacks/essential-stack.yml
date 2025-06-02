@@ -1,0 +1,203 @@
+version: '3'
+
+# ===================================================
+# 神4コンテナ用Portainer Stack定義ファイル v1.1
+# ===================================================
+# 使用方法:
+# 1. 環境検出スクリプト(ugreen-env-detect.sh)で設定値を確認
+# 2. 下記の環境依存部分を実際の値に変更
+# 3. PortainerのStacks機能でデプロイ
+# ===================================================
+# 重要: Portainer自体は先にSSH経由での導入が必要です
+# ===================================================
+
+# 共通環境変数（環境検出スクリプトの結果に合わせて変更してください）
+x-environment: &common-env
+  # ユーザーID/グループID - 重要: UGREEN NASでは通常1000/100が正解
+  # 🔍 環境検出スクリプトで確認した値を使用してください
+  # 🤔 多くのガイドでは1000/1000と書かれていますが、UGREEN NASでは1000/100が正解
+  PUID: 1000
+  PGID: 100  # ← 重要！多くのガイドでは1000だが、UGREEN NASでは100が正解
+  
+  # タイムゾーン設定
+  TZ: Asia/Tokyo
+
+# ボリューム定義（環境検出スクリプトの結果に合わせて変更してください）
+x-volumes: &common-volumes
+  # 内蔵ドライブのメディアパス
+  # 📁 通常はUGREEN NASでは /volume1 です
+  MEDIA_PATH: /volume1
+  
+  # 外付けHDDのパス
+  # 💾 環境検出スクリプトで確認した実際のパスを使用
+  # 例: /mnt/@usb/sdd1, /mnt/@usb/sda1 など
+  USB_PATH: /mnt/@usb/sdd1
+  
+  # ドキュメントパス
+  # 📄 バックアップ対象のパス（環境に合わせて調整）
+  DOCUMENTS_PATH: /volume1
+  
+  # コンテナ設定保存用パス
+  # ⚙️ コンテナの設定ファイルを保存する場所
+  CONFIG_PATH: /volume1/docker/configs
+
+services:
+  # ===================================================
+  # Duplicati - バックアップツール
+  # ===================================================
+  # 🔍 実践的知見: 設定したPUID/PGIDと異なるユーザー
+  # （例: davetanaka）でファイルが作成されることがあります
+  # これはコンテナの特性で、通常は問題ありません
+  # ===================================================
+  duplicati:
+    image: linuxserver/duplicati:latest
+    container_name: duplicati
+    restart: unless-stopped
+    ports:
+      - 8200:8200  # WebUI用ポート（必要に応じて変更可）
+    environment:
+      <<: *common-env
+    volumes:
+      # 設定保存先
+      - ${CONFIG_PATH:-/volume1/docker/configs}/duplicati:/config
+      # バックアップ対象（環境に合わせて変更）
+      - ${DOCUMENTS_PATH:-/volume1}:/source/volume1:ro
+      # バックアップ保存先（外付けHDD）
+      - ${USB_PATH:-/mnt/@usb/sdd1}/duplicati-backups:/backups
+    # リソース制限（必要に応じて調整）
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+
+  # ===================================================
+  # Fail2ban - セキュリティ監視
+  # ===================================================
+  # 🔍 実践的知見: Fail2banはroot権限で実行されることが多く、
+  # PUID/PGID設定が無視されることがあります。これは正常です。
+  # ===================================================
+  fail2ban:
+    image: crazymax/fail2ban:latest
+    container_name: fail2ban
+    restart: unless-stopped
+    network_mode: "host"  # ホストネットワークモード（変更不要）
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      <<: *common-env
+      # Fail2ban設定（必要に応じて調整）
+      F2B_DB_PURGE_AGE: 7d  # 7日分のログを保持
+      F2B_LOG_TARGET: STDOUT
+      F2B_LOG_LEVEL: INFO
+    volumes:
+      # 設定保存先
+      - ${CONFIG_PATH:-/volume1/docker/configs}/fail2ban:/data
+      # 監視対象のログファイル
+      - /var/log:/var/log:ro
+      # Dockerソケット
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # リソース制限（必要に応じて調整）
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  # ===================================================
+  # Tailscale - VPNサービス
+  # ===================================================
+  # 🔍 実践的知見: Tailscaleはroot権限で実行されることが多く、
+  # PUID/PGID設定が無視されることがあります。これは正常です。
+  # ===================================================
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    restart: unless-stopped
+    network_mode: "host"  # ホストネットワークモード（変更不要）
+    privileged: true  # 特権モード（VPN機能に必要）
+    environment:
+      <<: *common-env
+      # Tailscale設定（初回実行後に認証が必要）
+      TS_STATE_DIR: /var/lib/tailscale
+      # MagicDNSを有効化
+      # 🔍 あなたの実際のネットワーク範囲に変更してください
+      # 例: 192.168.1.0/24, 192.168.0.0/24
+      TS_EXTRA_ARGS: --advertise-routes=192.168.0.0/24 --accept-dns=true
+    volumes:
+      # 設定保存先
+      - ${CONFIG_PATH:-/volume1/docker/configs}/tailscale:/var/lib/tailscale
+      # TUNデバイス
+      - /dev/net/tun:/dev/net/tun
+    # リソース制限（必要に応じて調整）
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  # ===================================================
+  # Jellyfin - メディアサーバー
+  # ===================================================
+  # 🔍 実践的知見: Jellyfinの一部ファイルはUID=911で
+  # 作成されることがあります。これはコンテナの特性で、
+  # 通常は問題ありません。
+  # ===================================================
+  jellyfin:
+    image: linuxserver/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    ports:
+      - 8096:8096  # WebUI用ポート（必要に応じて変更可）
+      - 8920:8920  # HTTPS用ポート（必要に応じて変更可）
+      - 7359:7359/udp  # 自動検出用ポート（変更不要）
+      - 1900:1900/udp  # DLNA用ポート（必要に応じて変更可）
+    environment:
+      <<: *common-env
+      # ハードウェアアクセラレーション設定（環境に合わせて調整）
+      # 🔍 あなたのNASの実際のIPアドレスに変更してください
+      JELLYFIN_PublishedServerUrl: 192.168.0.100
+    volumes:
+      # 設定保存先
+      - ${CONFIG_PATH:-/volume1/docker/configs}/jellyfin:/config
+      # メディアファイル（環境に合わせて変更）
+      - ${MEDIA_PATH:-/volume1}:/media
+      # トランスコード用一時ディレクトリ（SSDがあれば指定）
+      - /tmp/jellyfin:/transcode
+    # ハードウェアアクセラレーション設定（必要に応じて有効化）
+    #devices:
+    #  - /dev/dri:/dev/dri  # Intel QuickSync
+    # リソース制限（必要に応じて調整）
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '4.0'
+    # ログ設定（監視用）
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ===================================================
+# 使用方法:
+# 1. 環境検出スクリプト(ugreen-env-detect.sh)を実行
+# 2. 上記の設定値を実際の環境に合わせて変更
+# 3. PortainerでStacksを選択
+# 4. "Add stack"をクリック
+# 5. このYAMLファイルの内容を貼り付け
+# 6. "Deploy the stack"をクリック
+#
+# 🔍 理論と実践のギャップ:
+# - 設定したPUID/PGIDと異なるユーザーでファイルが作成されることがあります
+# - これはコンテナイメージの特性によるもので、通常は問題ありません
+# - 問題が発生した場合のみ、実際のUID/GIDに合わせて調整してください
+#
+# 📋 初期設定が必要なコンテナ:
+# - Duplicati: http://NAS-IP:8200 でバックアップジョブ設定
+# - Tailscale: SSH接続後に `docker exec -it tailscale tailscale up` で認証
+# - Jellyfin: http://NAS-IP:8096 で初期設定ウィザード実行
+# - Fail2ban: 基本設定で自動動作、カスタマイズは任意
+# ===================================================

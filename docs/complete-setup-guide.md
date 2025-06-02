@@ -34,7 +34,7 @@ ssh nasuser@あなたのNASのIPアドレス
 
 ```bash
 # スクリプトをダウンロード
-wget -O ugreen-env-detect.sh https://raw.githubusercontent.com/yourname/ugreen-nas-docker-helper/main/scripts/ugreen-env-detect.sh
+wget -O ugreen-env-detect.sh https://raw.githubusercontent.com/davetanaka/ugreen-nas-docker-helper/main/scripts/ugreen-env-detect.sh
 
 # 実行権限を付与
 chmod +x ugreen-env-detect.sh

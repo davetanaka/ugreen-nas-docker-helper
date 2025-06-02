@@ -96,12 +96,11 @@ ugreen-nas-docker-helper/
 │   └── ugreen-env-detect.sh     # 環境検出スクリプト
 ├── stacks/
 │   └── essential-stack.yml      # 神3アプリ用Stack定義
-├── docs/
-│   ├── complete-setup-guide.md  # 完全セットアップガイド
-│   ├── simple-troubleshooting.md # トラブルシューティング
-│   └── security-notes.md        # セキュリティガイド
-└── examples/
-    └── portainer-setup.md       # Portainer設定例
+└── docs/
+    ├── complete-setup-guide.md  # 完全セットアップガイド
+    ├── simple-troubleshooting.md # トラブルシューティング
+    └── security-notes.md        # セキュリティガイド
+
 ```
 
 ## ❓ なぜこのプロジェクトが必要なのか？

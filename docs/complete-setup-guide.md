@@ -34,7 +34,7 @@ ssh nasuser@あなたのNASのIPアドレス
 
 ```bash
 # スクリプトをダウンロード
-wget -O ugreen-env-detect.sh https://raw.githubusercontent.com/davetanaka/ugreen-nas-docker-helper/main/scripts/ugreen-env-detect.sh
+wget -O ugreen-env-detect.sh https://raw.githubusercontent.com/yourname/ugreen-nas-docker-helper/main/scripts/ugreen-env-detect.sh
 
 # 実行権限を付与
 chmod +x ugreen-env-detect.sh
@@ -127,12 +127,93 @@ Volumes:
 #### B.1 YAMLファイルの準備
 
 1. Portainer → 「Stacks」→「+ Add stack」
-2. Name: `god3-stack`
+2. Name: `essential-stack`
 3. 以下のYAMLをコピー&ペースト：
 
 ```yaml
-# god3-stack.ymlの内容を貼り付け
-# （詳細は stacks/essential/god3-stack.yml を参照）
+# 神3スタック（Duplicati, Tailscale, Jellyfin）
+version: '3'
+
+# 共通環境変数（環境検出スクリプトの結果に合わせて変更してください）
+x-environment: &common-env
+  PUID: 1000
+  PGID: 100  # ← 重要！多くのガイドでは1000だが、UGREEN NASでは100が正解
+  TZ: Asia/Tokyo
+
+# ボリューム定義（環境検出スクリプトの結果に合わせて変更してください）
+x-volumes: &common-volumes
+  MEDIA_PATH: /volume1
+  USB_PATH: /mnt/@usb/sdd1
+  DOCUMENTS_PATH: /volume1
+  CONFIG_PATH: /volume1/docker/configs
+
+services:
+  # Duplicati - バックアップツール
+  duplicati:
+    image: linuxserver/duplicati:latest
+    container_name: duplicati
+    restart: unless-stopped
+    ports:
+      - 8200:8200
+    environment:
+      <<: *common-env
+    volumes:
+      - ${CONFIG_PATH:-/volume1/docker/configs}/duplicati:/config
+      - ${DOCUMENTS_PATH:-/volume1}:/source/volume1:ro
+      - ${USB_PATH:-/mnt/@usb/sdd1}/duplicati-backups:/backups
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+
+  # Tailscale - VPNサービス
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    restart: unless-stopped
+    network_mode: "host"
+    privileged: true
+    environment:
+      <<: *common-env
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_EXTRA_ARGS: --advertise-routes=192.168.0.0/24 --accept-dns=true
+    volumes:
+      - ${CONFIG_PATH:-/volume1/docker/configs}/tailscale:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  # Jellyfin - メディアサーバー
+  jellyfin:
+    image: linuxserver/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    ports:
+      - 8096:8096
+      - 8920:8920
+      - 7359:7359/udp
+      - 1900:1900/udp
+    environment:
+      <<: *common-env
+      JELLYFIN_PublishedServerUrl: 192.168.0.78  # あなたの実際のIPアドレスに変更
+    volumes:
+      - ${CONFIG_PATH:-/volume1/docker/configs}/jellyfin:/config
+      - ${MEDIA_PATH:-/volume1}:/media
+      - /tmp/jellyfin:/transcode
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '4.0'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 ```
 
 #### B.2 環境設定の調整
@@ -145,6 +226,7 @@ PUID: 1000
 PGID: 100  # ← 重要！実際の値を確認
 USB_PATH: /mnt/@usb/sdd1  # ← 実際のパスを確認
 JELLYFIN_PublishedServerUrl: 192.168.0.78  # ← 実際のIPアドレス
+TS_EXTRA_ARGS: --advertise-routes=192.168.0.0/24 --accept-dns=true  # ← ネットワーク範囲
 ```
 
 #### B.3 デプロイ
@@ -196,6 +278,7 @@ sudo docker ps
 sudo docker logs duplicati
 sudo docker logs tailscale
 sudo docker logs jellyfin
+sudo docker logs fail2ban
 ```
 
 ### 5.2 マウント状況の確認
@@ -257,7 +340,7 @@ sudo chmod 777 /mnt/@usb/sdd1/
 
 #### 問題3: 権限エラー（PUID/PGID問題）
 
-**症状**: ファイルが異なるユーザー（davetanaka、911など）で作成される
+**症状**: ファイルが異なるユーザー（unknown、911など）で作成される
 
 **理解すべきこと**: 
 - これは「理論と実践のギャップ」の典型例
@@ -297,6 +380,7 @@ sudo journalctl -u docker
 sudo docker logs --tail 50 duplicati
 sudo docker logs --tail 50 tailscale
 sudo docker logs --tail 50 jellyfin
+sudo docker logs --tail 50 fail2ban
 
 # リアルタイムログ監視
 sudo docker logs -f コンテナ名
@@ -323,16 +407,13 @@ sudo docker logs -f コンテナ名
 
 ```bash
 # 月1回程度実行
-cd /path/to/stack/directory
-
-# Stackの停止
-docker-compose down
-
-# イメージ更新
-docker-compose pull
-
-# Stack再起動
-docker-compose up -d
+# Portainerで該当スタックを選択
+# 「Editor」→「Update the stack」をクリック
+# または以下のコマンドで個別更新
+sudo docker pull linuxserver/duplicati:latest
+sudo docker pull linuxserver/jellyfin:latest
+sudo docker pull tailscale/tailscale:latest
+sudo docker pull crazymax/fail2ban:latest
 ```
 
 ### 7.2 ログクリーンアップ
@@ -398,10 +479,7 @@ sudo netstat -tlnp  # 開放ポート確認
 
 ### 9.1 Uptime Kuma導入（オプション）
 
-```bash
-# 監視ツールの追加
-# Stackに追加、またはPortainerで個別導入
-```
+監視ツールを追加することで、各サービスの死活監視が可能になります。
 
 ### 9.2 基本的な監視スクリプト
 
@@ -419,22 +497,22 @@ echo "=== メモリ使用量 ==="
 free -h
 ```
 
-## 🎯 DAVEスコア評価
+## 🎯 システム評価
 
 ### Before（素のUGREEN NAS）
-- **コスパ(VE)**: 18点 - ハード性能は素晴らしい
-- **健康プラス度(HH)**: 11点 - ただの保存装置
-- **使いやすさ(UE)**: 12点 - 初心者には厳しい
-- **耐久性・サポート(DS)**: 10点 - サポート体制が課題
-- **環境・社会影響(ESI)**: 8点 - 特筆すべき配慮なし
+- **コスパ**: 18点 - ハード性能は素晴らしい
+- **健康プラス度**: 11点 - ただの保存装置
+- **使いやすさ**: 12点 - 初心者には厳しい
+- **耐久性・サポート**: 10点 - サポート体制が課題
+- **環境・社会影響**: 8点 - 特筆すべき配慮なし
 - **総合**: 59点
 
 ### After（神5アプリ導入後）
-- **コスパ(VE)**: 19点 - 投資効果抜群！
-- **健康プラス度(HH)**: 17点 - セキュリティ安心、学習機会、エンタメ向上
-- **使いやすさ(UE)**: 16点 - Portainerで直感操作可能
-- **耐久性・サポート(DS)**: 12点 - コミュニティサポート充実
-- **環境・社会影響(ESI)**: 10点 - 知識共有で社会貢献
+- **コスパ**: 19点 - 投資効果抜群！
+- **健康プラス度**: 17点 - セキュリティ安心、学習機会、エンタメ向上
+- **使いやすさ**: 16点 - Portainerで直感操作可能
+- **耐久性・サポート**: 12点 - コミュニティサポート充実
+- **環境・社会影響**: 10点 - 知識共有で社会貢献
 - **総合**: 74点（+15点アップ！）
 
 ## 🎉 おめでとうございます！

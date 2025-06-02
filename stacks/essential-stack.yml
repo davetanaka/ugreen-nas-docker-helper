@@ -157,7 +157,7 @@ services:
       <<: *common-env
       # ハードウェアアクセラレーション設定（環境に合わせて調整）
       # 🔍 あなたのNASの実際のIPアドレスに変更してください
-      JELLYFIN_PublishedServerUrl: 192.168.0.100
+      JELLYFIN_PublishedServerUrl: 192.168.0.78  # 環境検出スクリプトで確認したIPアドレスに変更
     volumes:
       # 設定保存先
       - ${CONFIG_PATH:-/volume1/docker/configs}/jellyfin:/config

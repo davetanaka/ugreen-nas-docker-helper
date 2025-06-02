@@ -42,7 +42,7 @@ UGREEN NAS Docker Helperは、実際のUGREEN NAS環境で発見された「理�
 ssh nasuser@あなたのNASのIP
 
 # スクリプトをダウンロードして実行
-wget -O ugreen-env-detect.sh https://raw.githubusercontent.com/yourname/ugreen-nas-docker-helper/main/scripts/ugreen-env-detect.sh
+wget -O ugreen-env-detect.sh https://raw.githubusercontent.com/davetanaka/ugreen-nas-docker-helper/main/scripts/ugreen-env-detect.sh
 chmod +x ugreen-env-detect.sh
 ./ugreen-env-detect.sh
 2. 神5コンテナの導入
@@ -73,8 +73,7 @@ ugreen-nas-docker-helper/
 ├── scripts/
 │   └── ugreen-env-detect.sh     # 環境検出スクリプト
 ├── stacks/
-│   └── essential/
-│       └── god3-stack.yml       # 神3アプリ用Stack定義
+│   └── essential-stack.yml       # 神3アプリ用Stack定義
 ├── docs/
 │   ├── complete-setup-guide.md  # 完全セットアップガイド
 │   ├── simple-troubleshooting.md # トラブルシューティング
@@ -265,7 +264,7 @@ Star ⭐ をお願いします！
 
 **「理論と実践のギャップを埋める、UGREEN NAS用Docker環境構築ツール」**
 
-[![GitHub stars](https://img.shields.io/github/stars/yourname/ugreen-nas-docker-helper?style=social)](https://github.com/yourname/ugreen-nas-docker-helper)
+[![GitHub stars](https://img.shields.io/github/stars/davetanaka/ugreen-nas-docker-helper?style=social)](https://github.com/davetanaka/ugreen-nas-docker-helper)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![UGREEN NAS](https://img.shields.io/badge/UGREEN-NAS-green.svg)](https://www.ugreengroup.com/)
 

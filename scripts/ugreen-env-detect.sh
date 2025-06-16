@@ -148,6 +148,8 @@ get_hostname() {
 check_docker_permission() {
     if docker ps >/dev/null 2>&1; then
         return 0
+    elif [[ "$OS" == "macOS" ]]; then
+        return 2
     elif sudo docker ps >/dev/null 2>&1; then
         return 1
     else

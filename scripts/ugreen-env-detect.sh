@@ -9,20 +9,29 @@
 # ライセンス: MIT
 # =============================================================================
 
-declare -A COMMAND_CACHE
+if [[ "${BASH_VERSION%%.*}" -ge 4 ]]; then
+    declare -A COMMAND_CACHE
+else
+    COMMAND_CACHE=""
+fi
 
 has_command() {
     local cmd="$1"
-    if [[ -n "${COMMAND_CACHE[$cmd]}" ]]; then
-        return "${COMMAND_CACHE[$cmd]}"
-    fi
     
-    if command -v "$cmd" >/dev/null 2>&1; then
-        COMMAND_CACHE[$cmd]=0
-        return 0
+    if [[ "${BASH_VERSION%%.*}" -ge 4 ]]; then
+        if [[ -n "${COMMAND_CACHE[$cmd]:-}" ]]; then
+            return "${COMMAND_CACHE[$cmd]}"
+        fi
+        
+        if command -v "$cmd" >/dev/null 2>&1; then
+            COMMAND_CACHE[$cmd]=0
+            return 0
+        else
+            COMMAND_CACHE[$cmd]=1
+            return 1
+        fi
     else
-        COMMAND_CACHE[$cmd]=1
-        return 1
+        command -v "$cmd" >/dev/null 2>&1
     fi
 }
 

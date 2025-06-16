@@ -137,6 +137,6 @@ The optimizations maintain full backward compatibility and don't change the scri
 ---
 
 **Report Generated**: June 16, 2025  
-**Analysis Target**: ugreen-env-detect.sh v1.1.0  
+**Analysis Target**: ugreen-env-detect.sh v1.1.1  
 **Total Lines Analyzed**: 598  
 **Optimization Opportunities Found**: 5 categories, 20+ specific instances

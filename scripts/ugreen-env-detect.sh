@@ -65,7 +65,7 @@ detect_os() {
 # ヘッダー表示
 print_header() {
     echo -e "${CYAN}=================================================${NC}"
-    echo -e "${WHITE}${ICON_INFO} UGREEN NAS環境情報収集スクリプト v1.1.0${NC}"
+    echo -e "${WHITE}${ICON_INFO} UGREEN NAS環境情報収集スクリプト v1.1.1${NC}"
     echo -e "${CYAN}=================================================${NC}"
     echo -e "${YELLOW}理論と実践のギャップを埋める、あなた専用の設定値を検出します${NC}"
     echo -e "${BLUE}対応OS: Linux (UGREEN NAS), macOS${NC}"

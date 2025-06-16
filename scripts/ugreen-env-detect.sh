@@ -1,13 +1,30 @@
 #!/bin/bash
 
 # =============================================================================
-# UGREEN NAS 環境検出スクリプト v1.1.0 (MacOS対応版)
+# UGREEN NAS 環境検出スクリプト v1.1.1 (効率化版)
 # =============================================================================
 # 目的: UGREEN NAS環境の設定値を自動検出し、Docker設定を最適化
 # 対応: Linux (UGREEN NAS), macOS, その他Unix系OS
 # 作成: UGREEN NAS Docker Helper プロジェクト
 # ライセンス: MIT
 # =============================================================================
+
+declare -A COMMAND_CACHE
+
+has_command() {
+    local cmd="$1"
+    if [[ -n "${COMMAND_CACHE[$cmd]}" ]]; then
+        return "${COMMAND_CACHE[$cmd]}"
+    fi
+    
+    if command -v "$cmd" >/dev/null 2>&1; then
+        COMMAND_CACHE[$cmd]=0
+        return 0
+    else
+        COMMAND_CACHE[$cmd]=1
+        return 1
+    fi
+}
 
 # 色付き出力の設定
 RED='\033[0;31m'
@@ -48,7 +65,7 @@ detect_os() {
 # ヘッダー表示
 print_header() {
     echo -e "${CYAN}=================================================${NC}"
-    echo -e "${WHITE}${ICON_INFO} UGREEN NAS環境情報収集スクリプト v1.1.0${NC}"
+    echo -e "${WHITE}${ICON_INFO} UGREEN NAS環境情報収集スクリプト v1.1.1${NC}"
     echo -e "${CYAN}=================================================${NC}"
     echo -e "${YELLOW}理論と実践のギャップを埋める、あなた専用の設定値を検出します${NC}"
     echo -e "${BLUE}対応OS: Linux (UGREEN NAS), macOS${NC}"
@@ -98,10 +115,10 @@ get_local_ip() {
         fi
     elif [[ "$OS" == "Linux" ]]; then
         # Linux用のIPアドレス取得
-        if command -v ip >/dev/null 2>&1; then
+        if has_command ip; then
             ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7}' | head -n1)
         fi
-        if [ -z "$ip" ] && command -v hostname >/dev/null 2>&1; then
+        if [ -z "$ip" ] && has_command hostname; then
             ip=$(hostname -I 2>/dev/null | awk '{print $1}')
         fi
     fi
@@ -245,7 +262,7 @@ collect_storage_info() {
             
             # 未マウントのUSBデバイスをチェック
             print_info "未マウントのUSBデバイス確認中..."
-            if command -v lsblk >/dev/null 2>&1; then
+            if has_command lsblk; then
                 lsblk -f | grep -E "(sd[b-z]|nvme)" | while read line; do
                     if echo "$line" | grep -v "/" >/dev/null; then
                         print_info "未マウント: ${line}"
@@ -284,13 +301,13 @@ collect_network_info() {
     print_info "重要ポートの使用状況:"
     
     for port in "${important_ports[@]}"; do
-        if command -v netstat >/dev/null 2>&1; then
+        if has_command netstat; then
             if netstat -an 2>/dev/null | grep -E ":${port}[[:space:]]" >/dev/null; then
                 print_warning "  ポート ${port}: 使用中"
             else
                 print_success "  ポート ${port}: 利用可能"
             fi
-        elif command -v ss >/dev/null 2>&1; then
+        elif has_command ss; then
             if ss -tlnp 2>/dev/null | grep ":${port} " >/dev/null; then
                 print_warning "  ポート ${port}: 使用中"
             else
@@ -357,7 +374,7 @@ collect_docker_info() {
         fi
         
         # Docker Compose
-        if command -v docker-compose >/dev/null 2>&1; then
+        if has_command docker-compose; then
             compose_version=$(docker-compose --version 2>/dev/null | cut -d' ' -f3 | cut -d',' -f1)
             print_info "Docker Composeバージョン: ${compose_version}"
         elif $docker_cmd compose version >/dev/null 2>&1; then
@@ -394,7 +411,7 @@ collect_security_info() {
         print_info "macOS環境のセキュリティ:"
         
         # Firewall状態
-        if command -v /usr/libexec/ApplicationFirewall/socketfilterfw >/dev/null 2>&1; then
+        if has_command /usr/libexec/ApplicationFirewall/socketfilterfw; then
             fw_state=$(/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>/dev/null | grep -o "enabled\|disabled")
             if [ "$fw_state" = "enabled" ]; then
                 print_success "macOSファイアウォール: 有効"
@@ -425,14 +442,14 @@ collect_security_info() {
         fi
         
         # ファイアウォール
-        if command -v ufw >/dev/null 2>&1; then
+        if has_command ufw; then
             ufw_status=$(ufw status 2>/dev/null | head -1)
             if echo "$ufw_status" | grep -q "active"; then
                 print_success "ファイアウォール (UFW): 有効"
             else
                 print_warning "ファイアウォール (UFW): 無効"
             fi
-        elif command -v iptables >/dev/null 2>&1; then
+        elif has_command iptables; then
             iptables_rules=$(iptables -L 2>/dev/null | wc -l)
             if [ "$iptables_rules" -gt 8 ]; then
                 print_info "ファイアウォール (iptables): カスタムルール有り"

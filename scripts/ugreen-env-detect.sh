@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================================================
-# UGREEN NAS 環境検出スクリプト v1.1.1 (効率化版)
+# UGREEN NAS 環境検出スクリプト v1.2.0 (ストレージ検出強化版)
 # =============================================================================
 # 目的: UGREEN NAS環境の設定値を自動検出し、Docker設定を最適化
 # 対応: Linux (UGREEN NAS), macOS, その他Unix系OS
@@ -65,7 +65,7 @@ detect_os() {
 # ヘッダー表示
 print_header() {
     echo -e "${CYAN}=================================================${NC}"
-    echo -e "${WHITE}${ICON_INFO} UGREEN NAS環境情報収集スクリプト v1.1.1${NC}"
+    echo -e "${WHITE}${ICON_INFO} UGREEN NAS環境情報収集スクリプト v1.2.0${NC}"
     echo -e "${CYAN}=================================================${NC}"
     echo -e "${YELLOW}理論と実践のギャップを埋める、あなた専用の設定値を検出します${NC}"
     echo -e "${BLUE}対応OS: Linux (UGREEN NAS), macOS${NC}"
@@ -225,14 +225,20 @@ collect_storage_info() {
         
     else
         # Linux (UGREEN NAS) 用のストレージ情報
-        # 内蔵ドライブ
-        if [ -d "/volume1" ]; then
-            volume1_size=$(df -h /volume1 | tail -1 | awk '{print $2}')
-            volume1_used=$(df -h /volume1 | tail -1 | awk '{print $3}')
-            volume1_avail=$(df -h /volume1 | tail -1 | awk '{print $4}')
-            print_success "内蔵ドライブ (/volume1): ${volume1_size} (使用: ${volume1_used}, 空き: ${volume1_avail})"
-        else
-            print_warning "標準的な内蔵ドライブパス (/volume1) が見つかりません"
+        internal_volumes=()
+        for vol_num in {1..8}; do
+            vol_path="/volume${vol_num}"
+            if [ -d "$vol_path" ]; then
+                vol_size=$(df -h "$vol_path" | tail -1 | awk '{print $2}')
+                vol_used=$(df -h "$vol_path" | tail -1 | awk '{print $3}')
+                vol_avail=$(df -h "$vol_path" | tail -1 | awk '{print $4}')
+                internal_volumes+=("$vol_path")
+                print_success "内蔵ドライブ (${vol_path}): ${vol_size} (使用: ${vol_used}, 空き: ${vol_avail})"
+            fi
+        done
+        
+        if [ ${#internal_volumes[@]} -eq 0 ]; then
+            print_warning "標準的な内蔵ドライブパス (/volume1-8) が見つかりません"
             # 代替パスをチェック
             for path in "/home" "/mnt/data" "/data"; do
                 if [ -d "$path" ]; then
@@ -241,12 +247,13 @@ collect_storage_info() {
             done
         fi
         
-        # 外付けHDD検索
-        print_info "外付けHDD検索中..."
+        # 外付けHDD検索 - 4ポート対応強化
+        print_info "外付けHDD検索中（最大4ポート対応）..."
         usb_devices=()
         
-        # 一般的なUSBマウントポイントをチェック
-        for usb_path in /mnt/@usb/* /mnt/usb/* /media/* /run/media/*/*; do
+        # UGREEN NAS特有のUSBマウントポイントを優先チェック
+        for device in sdb1 sdc1 sdd1 sde1 sda1; do
+            usb_path="/mnt/@usb/${device}"
             if [ -d "$usb_path" ] 2>/dev/null; then
                 usb_size=$(df -h "$usb_path" 2>/dev/null | tail -1 | awk '{print $2}' 2>/dev/null)
                 if [ ! -z "$usb_size" ] && [ "$usb_size" != "0" ]; then
@@ -255,6 +262,19 @@ collect_storage_info() {
                 fi
             fi
         done
+        
+        # 一般的なUSBマウントポイントもチェック（フォールバック）
+        if [ ${#usb_devices[@]} -eq 0 ]; then
+            for usb_path in /mnt/usb/* /media/* /run/media/*/*; do
+                if [ -d "$usb_path" ] 2>/dev/null; then
+                    usb_size=$(df -h "$usb_path" 2>/dev/null | tail -1 | awk '{print $2}' 2>/dev/null)
+                    if [ ! -z "$usb_size" ] && [ "$usb_size" != "0" ]; then
+                        usb_devices+=("$usb_path")
+                        print_success "外付けHDD: ${usb_path} (容量: ${usb_size})"
+                    fi
+                fi
+            done
+        fi
         
         if [ ${#usb_devices[@]} -eq 0 ]; then
             print_warning "外付けHDDが見つかりません"
@@ -270,8 +290,31 @@ collect_storage_info() {
                 done
             fi
         else
-            recommended_usb=${usb_devices[0]}
-            print_success "推奨外付けパス: ${recommended_usb}"
+            print_success "検出された外付けHDD: ${#usb_devices[@]}台"
+            for i in "${!usb_devices[@]}"; do
+                device_path="${usb_devices[$i]}"
+                device_size=$(df -h "$device_path" 2>/dev/null | tail -1 | awk '{print $2}' 2>/dev/null)
+                print_info "  USB$((i+1)): ${device_path} (容量: ${device_size})"
+            done
+            
+            largest_usb=""
+            largest_size=0
+            for device_path in "${usb_devices[@]}"; do
+                size_bytes=$(df "$device_path" 2>/dev/null | tail -1 | awk '{print $4}' 2>/dev/null || echo "0")
+                if [ "$size_bytes" -gt "$largest_size" ]; then
+                    largest_size="$size_bytes"
+                    largest_usb="$device_path"
+                fi
+            done
+            
+            if [ ! -z "$largest_usb" ]; then
+                recommended_usb="$largest_usb"
+                print_success "Duplicati推奨バックアップパス: ${recommended_usb}"
+                print_info "  ※ 最大容量のデバイスを推奨しています"
+            else
+                recommended_usb="${usb_devices[0]}"
+                print_success "Duplicati推奨バックアップパス: ${recommended_usb}"
+            fi
         fi
     fi
     
@@ -501,10 +544,27 @@ generate_recommendations() {
     else
         if [ ! -z "$recommended_usb" ]; then
             echo -e "${GREEN}  USB_PATH: ${recommended_usb}${NC}"
+            if [ ${#usb_devices[@]} -gt 1 ]; then
+                echo -e "${BLUE}  # 他の利用可能なUSBデバイス:${NC}"
+                for device_path in "${usb_devices[@]}"; do
+                    if [ "$device_path" != "$recommended_usb" ]; then
+                        echo -e "${BLUE}  # ${device_path}${NC}"
+                    fi
+                done
+            fi
         else
             echo -e "${YELLOW}  USB_PATH: /mnt/@usb/sdd1  # 実際のパスに変更してください${NC}"
         fi
-        echo -e "${GREEN}  MEDIA_PATH: /volume1${NC}"
+        
+        if [ ${#internal_volumes[@]} -gt 1 ]; then
+            echo -e "${GREEN}  MEDIA_PATH: ${internal_volumes[0]}${NC}"
+            echo -e "${BLUE}  # 他の利用可能な内蔵ボリューム:${NC}"
+            for vol_path in "${internal_volumes[@]:1}"; do
+                echo -e "${BLUE}  # MEDIA_PATH: ${vol_path}${NC}"
+            done
+        else
+            echo -e "${GREEN}  MEDIA_PATH: /volume1${NC}"
+        fi
     fi
     
     echo -e "${GREEN}  CONFIG_PATH: /volume1/docker/configs${NC}"
@@ -528,6 +588,17 @@ generate_recommendations() {
     echo -e "${BLUE}  • 設定値をコピーしてYAMLファイルに貼り付けてください${NC}"
     echo -e "${BLUE}  • IPアドレスとパスは実際の環境に合わせて調整してください${NC}"
     echo -e "${BLUE}  • ポート競合がある場合は代替ポートを使用してください${NC}"
+    
+    if [ ${#usb_devices[@]} -gt 0 ]; then
+        echo ""
+        echo -e "${WHITE}Duplicatiバックアップ設定のヒント:${NC}"
+        echo -e "${BLUE}  • 推奨USBパスをDuplicatiの保存先に設定してください${NC}"
+        echo -e "${BLUE}  • バックアップ先は内蔵ドライブとは別のUSBデバイスを使用${NC}"
+        if [ ${#usb_devices[@]} -gt 1 ]; then
+            echo -e "${BLUE}  • 複数のUSBデバイスがある場合は容量の大きいものを推奨${NC}"
+            echo -e "${BLUE}  • 冗長化のため複数デバイスへの分散バックアップも検討${NC}"
+        fi
+    fi
     
     echo ""
 }

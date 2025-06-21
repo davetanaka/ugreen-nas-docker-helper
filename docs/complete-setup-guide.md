@@ -27,8 +27,10 @@
 ```bash
 # MacまたはWindowsのターミナルから
 ssh nasuser@あなたのNASのIPアドレス
-# 例: ssh nasuser@192.168.0.78
+# 例: ssh nasuser@192.168.0.100
 ```
+
+⚠️ **重要**: 上記のIPアドレス（192.168.0.100）は例です。実際のNASのIPアドレスに置き換えてください。
 
 ### 1.2 環境検出スクリプトのダウンロードと実行
 
@@ -51,7 +53,7 @@ chmod +x ugreen-env-detect.sh
 🔍 UGREEN NAS環境情報を収集中...
 ==================================
 📊 システム情報
-ローカルIP: 192.168.0.78
+ローカルIP: 192.168.0.100
 PUID: 1000
 PGID: 100  ← 重要！多くのガイドでは1000だが、実際は100
 💾 ストレージ情報
@@ -199,7 +201,7 @@ services:
       - 1900:1900/udp
     environment:
       <<: *common-env
-      JELLYFIN_PublishedServerUrl: 192.168.0.78  # あなたの実際のIPアドレスに変更
+      JELLYFIN_PublishedServerUrl: 192.168.0.100  # あなたの実際のIPアドレスに変更
     volumes:
       - ${CONFIG_PATH:-/volume1/docker/configs}/jellyfin:/config
       - ${MEDIA_PATH:-/volume1}:/media
@@ -218,15 +220,73 @@ services:
 
 #### B.2 環境設定の調整
 
-YAMLファイル内の以下の箇所を、Step 1で確認した値に変更：
+### ⚠️ 重要: YAMLファイルの環境固有設定更新
+
+環境検出スクリプト実行後、**必ず**以下の手順でYAMLファイルを更新してください：
+
+#### Step 2.1: 必須更新項目の確認
+
+YAMLファイル内の⚠️マークが付いた以下の箇所を、Step 1で確認した値に変更：
 
 ```yaml
-# 環境検出スクリプトの結果に合わせて変更
-PUID: 1000
-PGID: 100  # ← 重要！実際の値を確認
-USB_PATH: /mnt/@usb/sdd1  # ← 実際のパスを確認
-JELLYFIN_PublishedServerUrl: 192.168.0.78  # ← 実際のIPアドレス
-TS_EXTRA_ARGS: --advertise-routes=192.168.0.0/24 --accept-dns=true  # ← ネットワーク範囲
+# 環境検出スクリプトの結果に合わせて変更が必要な項目
+PUID: 1000  # ← 環境検出スクリプトで表示された実際の値に変更
+PGID: 100   # ← 環境検出スクリプトで表示された実際の値に変更
+USB_PATH: /mnt/@usb/sdd1  # ← 実際のUSBパスに変更
+JELLYFIN_PublishedServerUrl: 192.168.0.100  # ← 実際のIPアドレスに変更
+TS_EXTRA_ARGS: --advertise-routes=192.168.0.0/24 --accept-dns=true  # ← ネットワーク範囲を調整
+SETTINGS_ENCRYPTION_KEY: "YourSecureKey2025!ChangeThis#Duplicati"  # ← 独自のキーに変更
+```
+
+#### Step 2.2: 設定例（環境検出結果に基づく）
+
+```yaml
+# 例: 環境検出スクリプトの結果が以下の場合
+# PUID: 1002, PGID: 10, IP: 192.168.1.50, USB: /mnt/@usb/sda1
+
+PUID: 1002  # ← 検出された値
+PGID: 10    # ← 検出された値
+USB_PATH: /mnt/@usb/sda1  # ← 検出されたUSBパス
+JELLYFIN_PublishedServerUrl: 192.168.1.50  # ← 検出されたIP
+TS_EXTRA_ARGS: --advertise-routes=192.168.1.0/24 --accept-dns=true  # ← ネットワーク範囲を調整
+SETTINGS_ENCRYPTION_KEY: "MySecureKey2025!Personal#Backup"  # ← 独自のキー
+```
+
+#### Step 2.3: AI処理による自動更新（オプション）
+
+AIツール（ChatGPT、Claude等）を使用する場合：
+
+1. 環境検出スクリプトの出力をコピー
+2. 以下のプロンプトを使用：
+
+```
+以下の環境検出結果を使用して、YAMLファイルの⚠️マークが付いた設定値を更新してください：
+
+[環境検出スクリプトの出力をここに貼り付け]
+
+更新対象：
+- PUID/PGID
+- JELLYFIN_PublishedServerUrl  
+- USB_PATH
+- TS_EXTRA_ARGS（ネットワーク範囲）
+- SETTINGS_ENCRYPTION_KEY（独自のキーに変更）
+```
+
+#### Step 2.4: 設定完了の確認
+
+更新後、以下の点を確認してください：
+
+✅ **必須項目チェックリスト**
+- [ ] PUID/PGID が環境検出結果と一致している
+- [ ] JELLYFIN_PublishedServerUrl が実際のNAS IPアドレスになっている  
+- [ ] USB_PATH が実際の外付けHDDパスになっている
+- [ ] TS_EXTRA_ARGS のネットワーク範囲が正しい
+- [ ] SETTINGS_ENCRYPTION_KEY が独自のキーに変更されている
+
+⚠️ **セキュリティ注意事項**
+- 暗号化キーは他人に推測されにくい複雑なものを使用
+- IPアドレスやパス情報を他人と共有しない
+- 設定ファイルのバックアップ時は個人情報に注意
 ```
 
 #### B.3 デプロイ

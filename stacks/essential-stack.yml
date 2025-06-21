@@ -50,16 +50,17 @@ services:
   # これはコンテナの特性で、通常は問題ありません
   # ===================================================
   duplicati:
-    image: linuxserver/duplicati:latest
+    image: duplicati/duplicati:latest
     container_name: duplicati
     restart: unless-stopped
     ports:
       - 8200:8200  # WebUI用ポート（必要に応じて変更可）
     environment:
       <<: *common-env
+      SETTINGS_ENCRYPTION_KEY: "UGreenNAS2025!SecureKey#Duplicati"
     volumes:
       # 設定保存先
-      - ${CONFIG_PATH:-/volume1/docker/configs}/duplicati:/config
+      - ${CONFIG_PATH:-/volume1/docker/configs}/duplicati:/data
       # バックアップ対象（環境に合わせて変更）
       - ${DOCUMENTS_PATH:-/volume1}:/source/volume1:ro
       # バックアップ保存先（外付けHDD）

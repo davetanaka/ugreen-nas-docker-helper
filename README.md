@@ -98,7 +98,7 @@ ugreen-nas-docker-helper/
 │   └── essential-stack.yml      # 神3アプリ用Stack定義
 └── docs/
     ├── complete-setup-guide.md  # 完全セットアップガイド
-    ├── troubleshooting.md # トラブルシューティング
+    ├── troubleshooting.md       # トラブルシューティング
     └── basic-security.md        # セキュリティガイド
 
 ```
